@@ -1,8 +1,12 @@
 import javafx.application.Application;
 import javafx.application.ConditionalFeature;
 import javafx.application.Platform;
+import javafx.concurrent.ScheduledService;
+import javafx.concurrent.Task;
 import javafx.geometry.Orientation;
+import javafx.geometry.Point2D;
 import javafx.scene.Camera;
+import javafx.scene.Cursor;
 import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.Parent;
@@ -11,7 +15,6 @@ import javafx.scene.Scene;
 import javafx.scene.SceneAntialiasing;
 import javafx.scene.SubScene;
 import javafx.scene.control.Button;
-import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
@@ -40,6 +43,7 @@ import javafx.scene.transform.Rotate;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
+import java.awt.Robot;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.net.URI;
@@ -54,14 +58,19 @@ public class JavaFx3dTest extends Application {
 	public static final Color X_COLOR = Color.RED;
 	public static final Color Y_COLOR = Color.BLUE;
 	public static final Color Z_COLOR = Color.GREEN;
+	public static final double SPEED_WALKING = 1;
+	public static final double SPEED_RUNNING = 3;
+
+	boolean walk = false;
+	double speed = SPEED_WALKING;
 
 	@Override
-	public void start(final Stage primaryStage) throws Exception {
-		primaryStage.setTitle("Sentinel Java Remake");
+	public void start(final Stage stage) throws Exception {
+		stage.setTitle("Sentinel Java Remake");
 
-		primaryStage.setFullScreen(true);
-		primaryStage.setFullScreenExitHint("");
-		primaryStage.setFullScreenExitKeyCombination(KeyCombination.NO_MATCH); // handled via menu
+		stage.setFullScreen(true);
+		stage.setFullScreenExitHint("");
+		stage.setFullScreenExitKeyCombination(KeyCombination.NO_MATCH); // handled via menu
 
 		BorderPane layout2d = new BorderPane();
 
@@ -73,8 +82,8 @@ public class JavaFx3dTest extends Application {
 		mainMenu.getItems().addAll(anyAction, fullscreenCmd, exitCmd);
 		menuBar.getMenus().add(mainMenu);
 
-		exitCmd.setOnAction(e -> primaryStage.close());
-		fullscreenCmd.setOnAction(e -> primaryStage.setFullScreen(!primaryStage.isFullScreen()));
+		exitCmd.setOnAction(e -> stage.close());
+		fullscreenCmd.setOnAction(e -> stage.setFullScreen(!stage.isFullScreen()));
 		fullscreenCmd.setAccelerator(KEY_COMBINATION_FULLSCREEN);
 
 		anyAction.setAccelerator(new KeyCodeCombination(KeyCode.D, KeyCombination.CONTROL_DOWN));
@@ -102,9 +111,45 @@ public class JavaFx3dTest extends Application {
 		PerspectiveCamera camera = new PerspectiveCamera(true);
 		camera.setFarClip(Double.MAX_VALUE);
 		scene3d.setCamera(camera);
+		scene3d.setFocusTraversable(true);
 
-		Xform cameraNode = new Xform();
+		CameraXform cameraNode = new CameraXform();
 		cameraNode.getChildren().add(camera);
+
+		scene3d.setOnKeyPressed(e -> {
+			KeyCode keycode = e.getCode();
+			if (keycode == KeyCode.E) {
+				walk = true;
+			}
+			if (keycode == KeyCode.A) {
+				speed = SPEED_RUNNING;
+			}
+		});
+
+		scene3d.setOnKeyReleased(e -> {
+			KeyCode keycode = e.getCode();
+			if (keycode == KeyCode.E) {
+				walk = false;
+			}
+			if (keycode == KeyCode.A) {
+				speed = SPEED_WALKING;
+			}
+		});
+
+		ScheduledService<Void> svc = new ScheduledService<Void>() {
+			@Override
+			protected Task<Void> createTask() {
+				return new Task<Void>() {
+					@Override
+					protected Void call() throws Exception {
+						Platform.runLater(() -> cameraNode.moveWithYaw(0, walk ? speed : 0));
+						return null;
+					}
+				};
+			}
+		};
+		svc.setPeriod(Duration.millis(20));
+		svc.start();
 
 		DoubleControl xControl = new DoubleControl("X", -1000, 1000, 0);
 		DoubleControl yControl = new DoubleControl("Y", -1000, 1000, 0);
@@ -139,8 +184,6 @@ public class JavaFx3dTest extends Application {
 
 		root3d.getChildren().add(cameraNode);
 
-		CheckBox fixedAtZeroCheckbox = new CheckBox("Fixed Eye At Camera Zero (N/A)");
-		fixedAtZeroCheckbox.setDisable(true);
 		Button debugButton = new Button("Debug output");
 		TextArea debugOutput = new TextArea();
 		debugOutput.setWrapText(true);
@@ -151,7 +194,6 @@ public class JavaFx3dTest extends Application {
 			debugOutput.setText(debugNode(root3d)));
 		VBox controls = new VBox(
 			new Label("Camera position"),
-			fixedAtZeroCheckbox,
 			xControl, yControl, zControl,
 			resetPosition,
 			new Separator(Orientation.HORIZONTAL),
@@ -169,6 +211,10 @@ public class JavaFx3dTest extends Application {
 			debugOutput
 		);
 		controls.setSpacing(5);
+		controls.setStyle("-fx-background-color: whitesmoke;" +
+			"-fx-border-color: transparent transparent transparent gray;" +
+			"-fx-border-width: 2px;" +
+			"-fx-padding: 5px;");
 
 		Sphere sphere = new Sphere(10);
 
@@ -177,19 +223,21 @@ public class JavaFx3dTest extends Application {
 		box.setTranslateZ(-1);
 		root3d.getChildren().addAll(sphere, box);
 
-		cameraNode.pos.xProperty().bind(xControl.valueProperty());
-		cameraNode.pos.yProperty().bind(yControl.valueProperty());
-		cameraNode.pos.zProperty().bind(zControl.valueProperty());
+		cameraNode.invertMouse = true;
 
-		cameraNode.yaw.angleProperty().bind(yawControl.valueProperty());
-		cameraNode.pitch.angleProperty().bind(pitchControl.valueProperty());
-		cameraNode.roll.angleProperty().bind(rollControl.valueProperty());
+		cameraNode.pos.xProperty().bindBidirectional(xControl.valueProperty());
+		cameraNode.pos.yProperty().bindBidirectional(yControl.valueProperty());
+		cameraNode.pos.zProperty().bindBidirectional(zControl.valueProperty());
 
-		camera.fieldOfViewProperty().bind(fovControl.valueProperty());
+		cameraNode.yaw.angleProperty().bindBidirectional(yawControl.valueProperty());
+		cameraNode.pitch.angleProperty().bindBidirectional(pitchControl.valueProperty());
+		cameraNode.roll.angleProperty().bindBidirectional(rollControl.valueProperty());
 
-		sphere.translateXProperty().bind(sxControl.valueProperty());
-		sphere.translateYProperty().bind(syControl.valueProperty());
-		sphere.translateZProperty().bind(szControl.valueProperty());
+		camera.fieldOfViewProperty().bindBidirectional(fovControl.valueProperty());
+
+		sphere.translateXProperty().bindBidirectional(sxControl.valueProperty());
+		sphere.translateYProperty().bindBidirectional(syControl.valueProperty());
+		sphere.translateZProperty().bindBidirectional(szControl.valueProperty());
 
 		layout2d.setCenter(group2d);
 		layout2d.setRight(controls);
@@ -199,9 +247,33 @@ public class JavaFx3dTest extends Application {
 		scene3d.widthProperty().bind(layout2d.widthProperty());
 		scene3d.heightProperty().bind(layout2d.heightProperty());
 
+		mainPane.setCursor(Cursor.NONE);
+
 		Scene rootAppScene = new Scene(mainPane);
-		primaryStage.setScene(rootAppScene);
-		primaryStage.show();
+		stage.setScene(rootAppScene);
+		stage.show();
+
+		double width = mainPane.getWidth();
+		double height = mainPane.getHeight();
+		Point2D mouseResetPoint = mainPane.localToScreen(width / 2, height / 2);
+		double resetX = mouseResetPoint.getX();
+		double resetY = mouseResetPoint.getY();
+
+//		BaseFXRobot robot = new BaseFXRobot(rootAppScene);
+		Robot robot = new Robot();
+		robot.mouseMove((int) resetX, (int) resetY);
+
+		mainPane.setOnMouseClicked(e -> {
+			scene3d.requestFocus();
+			System.out.println("e = " + e);
+		});
+		mainPane.setOnMouseMoved(e -> {
+			double deltaX = e.getScreenX() - resetX;
+			double deltaY = e.getScreenY() - resetY;
+
+			cameraNode.rotate(deltaX, deltaY);
+			robot.mouseMove((int) resetX, (int) resetY);
+		});
 
 //		playSound();
 //		playVideo();
@@ -212,7 +284,6 @@ public class JavaFx3dTest extends Application {
 	}
 
 	private void buildAxes(Group group3d) {
-		System.out.println("buildAxes()");
 		final PhongMaterial xMaterial = new PhongMaterial();
 		xMaterial.setDiffuseColor(X_COLOR.darker());
 		xMaterial.setSpecularColor(X_COLOR);
