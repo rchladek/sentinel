@@ -11,7 +11,7 @@ public class CameraXform extends Group {
 	public static final double PITCH_MIN = -85;
 	public static final double ROLL_MAX = 85;
 	public static final double ROLL_MIN = -85;
-	public static final double WRAP_YAW_AT = 360;
+	public static final double WRAP_YAW_AT = 180;
 	public static final double WRAP_YAW_COMPLEMENT = 360 - WRAP_YAW_AT;
 
 	private static final Rotate PITCH_OFFSET = new Rotate(-90, Rotate.X_AXIS);

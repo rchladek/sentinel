@@ -1,12 +1,11 @@
 import javafx.application.Application;
 import javafx.application.ConditionalFeature;
 import javafx.application.Platform;
+import javafx.beans.value.ObservableValue;
 import javafx.concurrent.ScheduledService;
 import javafx.concurrent.Task;
 import javafx.geometry.Orientation;
-import javafx.geometry.Point2D;
 import javafx.scene.Camera;
-import javafx.scene.Cursor;
 import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.Parent;
@@ -25,6 +24,7 @@ import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
+import javafx.scene.input.PickResult;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -41,9 +41,9 @@ import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
 import javafx.scene.transform.Rotate;
 import javafx.stage.Stage;
+import javafx.stage.Window;
 import javafx.util.Duration;
 
-import java.awt.Robot;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.net.URI;
@@ -63,6 +63,8 @@ public class JavaFx3dTest extends Application {
 
 	boolean walk = false;
 	double speed = SPEED_WALKING;
+	boolean spaceClick = false;
+	private Crosshair crosshair;
 
 	@Override
 	public void start(final Stage stage) throws Exception {
@@ -86,8 +88,8 @@ public class JavaFx3dTest extends Application {
 		fullscreenCmd.setOnAction(e -> stage.setFullScreen(!stage.isFullScreen()));
 		fullscreenCmd.setAccelerator(KEY_COMBINATION_FULLSCREEN);
 
-		anyAction.setAccelerator(new KeyCodeCombination(KeyCode.D, KeyCombination.CONTROL_DOWN));
-		anyAction.setOnAction(e -> menuBar.setVisible(!menuBar.visibleProperty().getValue()));
+		anyAction.setAccelerator(new KeyCodeCombination(KeyCode.ESCAPE));
+		anyAction.setOnAction(e -> Platform.runLater(() -> layout2d.setTop(layout2d.getTop() != null ? null : menuBar)));
 
 		// 2D
 		StackPane group2d = new StackPane();
@@ -95,6 +97,7 @@ public class JavaFx3dTest extends Application {
 		Text text = new Text("Press ESC to toggle menu\nPress Alt+Enter to toggle fullscreen\n" +
 			"3D is " + (Platform.isSupported(ConditionalFeature.SCENE3D) ? "fully" : "NOT") + " supported");
 		text.setTextAlignment(TextAlignment.CENTER);
+		text.setTranslateY(-100);
 		group2d.getChildren().add(text);
 
 		// 3D
@@ -115,26 +118,6 @@ public class JavaFx3dTest extends Application {
 
 		CameraXform cameraNode = new CameraXform();
 		cameraNode.getChildren().add(camera);
-
-		scene3d.setOnKeyPressed(e -> {
-			KeyCode keycode = e.getCode();
-			if (keycode == KeyCode.E) {
-				walk = true;
-			}
-			if (keycode == KeyCode.A) {
-				speed = SPEED_RUNNING;
-			}
-		});
-
-		scene3d.setOnKeyReleased(e -> {
-			KeyCode keycode = e.getCode();
-			if (keycode == KeyCode.E) {
-				walk = false;
-			}
-			if (keycode == KeyCode.A) {
-				speed = SPEED_WALKING;
-			}
-		});
 
 		ScheduledService<Void> svc = new ScheduledService<Void>() {
 			@Override
@@ -239,48 +222,89 @@ public class JavaFx3dTest extends Application {
 		sphere.translateYProperty().bindBidirectional(syControl.valueProperty());
 		sphere.translateZProperty().bindBidirectional(szControl.valueProperty());
 
-		layout2d.setCenter(group2d);
 		layout2d.setRight(controls);
 		layout2d.setTop(menuBar);
 
-		StackPane mainPane = new StackPane(scene3d, layout2d);
+		crosshair = new Crosshair();
+		StackPane mainPane = new StackPane(scene3d, group2d, layout2d, crosshair);
 		scene3d.widthProperty().bind(layout2d.widthProperty());
 		scene3d.heightProperty().bind(layout2d.heightProperty());
-
-		mainPane.setCursor(Cursor.NONE);
 
 		Scene rootAppScene = new Scene(mainPane);
 		stage.setScene(rootAppScene);
 		stage.show();
 
-		double width = mainPane.getWidth();
-		double height = mainPane.getHeight();
-		Point2D mouseResetPoint = mainPane.localToScreen(width / 2, height / 2);
-		double resetX = mouseResetPoint.getX();
-		double resetY = mouseResetPoint.getY();
-
-//		BaseFXRobot robot = new BaseFXRobot(rootAppScene);
-		Robot robot = new Robot();
-		robot.mouseMove((int) resetX, (int) resetY);
+		crosshair.resetMouse();
 
 		mainPane.setOnMouseClicked(e -> {
 			scene3d.requestFocus();
-			System.out.println("e = " + e);
+			if (spaceClick) {
+				PickResult pickResult = e.getPickResult();
+				Node intersectedNode = pickResult.getIntersectedNode();
+				if (intersectedNode instanceof Sphere) {
+					System.out.println("BINGO!");
+				}
+			}
 		});
 		mainPane.setOnMouseMoved(e -> {
-			double deltaX = e.getScreenX() - resetX;
-			double deltaY = e.getScreenY() - resetY;
+			double deltaX = e.getScreenX() - crosshair.getResetX();
+			double deltaY = e.getScreenY() - crosshair.getResetY();
 
+//			System.out.println("MOVE: " +deltaX + ", " + deltaY);
 			cameraNode.rotate(deltaX, deltaY);
-			robot.mouseMove((int) resetX, (int) resetY);
+			crosshair.resetMouse();
+		});
+//		mainPane.setCursor(Cursor.NONE);
+
+		group2d.setMouseTransparent(true);
+		layout2d.setPickOnBounds(false);
+
+		scene3d.setOnKeyPressed(e -> {
+			KeyCode keycode = e.getCode();
+			if (keycode == KeyCode.E) {
+				walk = true;
+			}
+			if (keycode == KeyCode.A) {
+				speed = SPEED_RUNNING;
+			}
+			if (keycode == KeyCode.SPACE) {
+				spaceClick = true;
+				// if we could get pick result here easily... now we move to mouse click handler
+				crosshair.click();
+			}
+		});
+
+		scene3d.setOnKeyReleased(e -> {
+			KeyCode keycode = e.getCode();
+			if (keycode == KeyCode.E) {
+				walk = false;
+			}
+			if (keycode == KeyCode.A) {
+				speed = SPEED_WALKING;
+			}
+			if (keycode == KeyCode.SPACE) {
+				spaceClick = false;
+			}
 		});
 
 //		playSound();
 //		playVideo();
 //		playYoutube();
 
+		Window window = rootAppScene.getWindow();
+		window.heightProperty().addListener(this::changedSceneSize);
+		window.widthProperty().addListener(this::changedSceneSize);
+		window.xProperty().addListener(this::changedSceneSize);
+		window.yProperty().addListener(this::changedSceneSize);
+
+		crosshair.refreshResetPosition();
 		resetPosition.fire();
 		debugButton.fire();
+	}
+
+	public void changedSceneSize(ObservableValue<? extends Number> observableValue, Number oldValue, Number newValue) {
+		// without runLater it does not reflect position after the actual resize
+		Platform.runLater(crosshair::refreshResetPosition);
 	}
 
 	private void buildAxes(Group group3d) {
