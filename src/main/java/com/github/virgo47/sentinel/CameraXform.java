@@ -1,3 +1,4 @@
+package com.github.virgo47.sentinel;
 
 import javafx.geometry.Point3D;
 import javafx.scene.Group;

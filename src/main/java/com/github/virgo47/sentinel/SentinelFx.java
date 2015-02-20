@@ -1,3 +1,5 @@
+package com.github.virgo47.sentinel;
+
 import javafx.application.Application;
 import javafx.application.ConditionalFeature;
 import javafx.application.Platform;
@@ -5,7 +7,9 @@ import javafx.beans.value.ObservableValue;
 import javafx.concurrent.ScheduledService;
 import javafx.concurrent.Task;
 import javafx.geometry.Orientation;
+import javafx.scene.AmbientLight;
 import javafx.scene.Camera;
+import javafx.scene.Cursor;
 import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.Parent;
@@ -34,6 +38,7 @@ import javafx.scene.paint.Color;
 import javafx.scene.paint.PhongMaterial;
 import javafx.scene.shape.Box;
 import javafx.scene.shape.CullFace;
+import javafx.scene.shape.DrawMode;
 import javafx.scene.shape.MeshView;
 import javafx.scene.shape.Sphere;
 import javafx.scene.shape.TriangleMesh;
@@ -44,12 +49,11 @@ import javafx.stage.Stage;
 import javafx.stage.Window;
 import javafx.util.Duration;
 
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.net.URI;
 import java.net.URISyntaxException;
 
-public class JavaFx3dTest extends Application {
+public class SentinelFx extends Application {
 
 	private static final KeyCodeCombination KEY_COMBINATION_FULLSCREEN = new KeyCodeCombination(KeyCode.ENTER, KeyCombination.ALT_DOWN);
 
@@ -108,8 +112,8 @@ public class JavaFx3dTest extends Application {
 
 		buildAxes(root3d);
 
-//		AmbientLight aLight = new AmbientLight(new Color(0.6, 0.7, 0.8, 1));
-//		root3d.getChildren().add(aLight);
+		AmbientLight aLight = new AmbientLight(new Color(0.9, 0.9, 0.95, 1));
+		root3d.getChildren().add(aLight);
 
 		PerspectiveCamera camera = new PerspectiveCamera(true);
 		camera.setFarClip(Double.MAX_VALUE);
@@ -155,8 +159,8 @@ public class JavaFx3dTest extends Application {
 		});
 		DoubleControl fovControl = new DoubleControl("FOV", 1, 180, 45);
 
-		DoubleControl sxControl = new DoubleControl("X", -1000, 1000, 0);
-		DoubleControl syControl = new DoubleControl("Y", -1000, 1000, 0);
+		DoubleControl sxControl = new DoubleControl("X", -1000, 1000, -20);
+		DoubleControl syControl = new DoubleControl("Y", -1000, 1000, 10);
 		DoubleControl szControl = new DoubleControl("Z", -1000, 1000, 0);
 		Button resetSphere = new Button("Reset");
 		resetSphere.setOnAction(e -> {
@@ -200,11 +204,14 @@ public class JavaFx3dTest extends Application {
 			"-fx-padding: 5px;");
 
 		Sphere sphere = new Sphere(10);
+		sphere.setMaterial(new PhongMaterial(Color.BROWN));
+		root3d.getChildren().addAll(sphere);
 
-//		addPlane(root3d);
-		Box box = new Box(200, 200, 1);
-		box.setTranslateZ(-1);
-		root3d.getChildren().addAll(sphere, box);
+		addPlane(root3d);
+
+//		Box box = new Box(200, 200, 1);
+//		box.setTranslateZ(-1);
+//		root3d.getChildren().addAll(box);
 
 		cameraNode.invertMouse = true;
 
@@ -244,6 +251,7 @@ public class JavaFx3dTest extends Application {
 				if (intersectedNode instanceof Sphere) {
 					System.out.println("BINGO!");
 				}
+				System.out.println("pickResult = " + pickResult);
 			}
 		});
 		mainPane.setOnMouseMoved(e -> {
@@ -254,7 +262,7 @@ public class JavaFx3dTest extends Application {
 			cameraNode.rotate(deltaX, deltaY);
 			crosshair.resetMouse();
 		});
-//		mainPane.setCursor(Cursor.NONE);
+		mainPane.setCursor(Cursor.NONE);
 
 		group2d.setMouseTransparent(true);
 		layout2d.setPickOnBounds(false);
@@ -335,59 +343,76 @@ public class JavaFx3dTest extends Application {
 	}
 
 	private void addPlane(Group group3d) throws FileNotFoundException {
-		Image diffuseMap = new Image(new FileInputStream("c:\\Users\\Virgo\\Pictures\\crescent-wallpaper.jpg"));
-		TriangleMesh planeMesh = new TriangleMesh();
+		TriangleMesh landscapeMesh = new TriangleMesh();
+		landscapeMesh.getPoints().addAll(
+			0, 0, 1,
+			1, 0, 1,
+			2, 0, 0,
+			3, 0, 0,
+			4, 0, 0,
+			0, 1, 1,
+			1, 1, 1,
+			2, 1, 0,
+			3, 1, 0,
+			4, 1, 0,
+			0, 2, 0,
+			1, 2, 0,
+			2, 2, 0,
+			3, 2, 0,
+			4, 2, 0,
+			0, 3, 0,
+			1, 3, 0,
+			2, 3, 0,
+			3, 3, 0,
+			4, 3, 0,
+			0, 4, 0,
+			1, 4, 0,
+			2, 4, 0,
+			3, 4, 0,
+			4, 4, 0
+		);
+		landscapeMesh.getTexCoords().addAll(
+			0.1f, 0.5f,
+			0.3f, 0.5f,
+			0.5f, 0.5f,
+			0.7f, 0.5f,
+			0.9f, 0.5f
+		);
 
-		float[] points = {
-			-5, 5, 0,
-			-5, -5, 0,
-			5, 5, 0,
-			5, -5, 0
-		};
-		float[] texCoords = {
-			1, 1,
-			1, 0,
-			0, 1,
-			0, 0
-		};
-		int[] faces = {
-			2, 2, 1, 1, 0, 0,
-			2, 2, 3, 3, 1, 1
-		};
-		planeMesh.getPoints().addAll(points);
-		planeMesh.getTexCoords().addAll(texCoords);
-		planeMesh.getFaces().addAll(faces);
-		MeshView meshView = new MeshView(planeMesh);
-		meshView.setMaterial(new PhongMaterial(Color.BLACK, diffuseMap, null, null, null));
-		int scale = 1000;
+		int sizeX = 4;
+		int sizeY = 4;
+		for (int i = 0; i < sizeX; i++) {
+			for (int j = 0; j < sizeY; j++) {
+				int arraySizeX = sizeX + 1;
+				int pointLeftBottom = i * arraySizeX + j;
+				int pointRightBottom = i * arraySizeX + j + 1;
+				int pointRightTop = (i + 1) * arraySizeX + j + 1;
+				int pointLeftTop = (i + 1) * arraySizeX + j;
+				System.out.println("\nCreating triangles:\n  " +
+					pointLeftBottom + ", " + pointRightBottom + ", " + pointRightTop + "\n  " +
+					pointLeftBottom + ", " + pointRightTop + ", " + pointLeftTop);
+				landscapeMesh.getFaces().addAll(
+					pointLeftBottom, 0, pointRightBottom, 1, pointRightTop, 3,
+					pointLeftBottom, 0, pointRightTop, 3, pointLeftTop, 2
+				);
+			}
+		}
+		MeshView meshView = new MeshView(landscapeMesh);
+		double scale = 100;
 		meshView.setScaleX(scale);
 		meshView.setScaleY(scale);
-		meshView.setScaleZ(scale);
+		meshView.setScaleZ(scale / 5);
 
-		meshView.setCullFace(CullFace.NONE);
+		meshView.setCullFace(CullFace.BACK);
+		meshView.setDrawMode(DrawMode.FILL);
 
-		group3d.getChildren().add(new MeshView(planeMesh));
+		PhongMaterial mat = new PhongMaterial();
+		Image simpleTexture = new Image(getClass().getClassLoader().getResourceAsStream("texture.png"));
+		mat.setDiffuseMap(simpleTexture);
+		meshView.setMaterial(mat);
+
+		group3d.getChildren().add(meshView);
 	}
-
-	/*
-	private void playVideo() throws URISyntaxException {
-		URI videoUri = new URI("file", "/f:/video/Byzantium (2012)/Byzantium.2013.mp4", null);
-//		String uri = "http://www.youtube.com/watch?v=VWkmz-hPnEE";
-		Media media = new Media(videoUri.toString());
-		MediaPlayer mediaPlayer = new MediaPlayer(media);
-		mediaPlayer.play();
-		MediaView mediaView = new MediaView(mediaPlayer);
-		rootLayout.setCenter(mediaView);
-	}
-
-	// loads the page, but video does not play
-	private void playYoutube() throws URISyntaxException {
-		String uri = "https://www.youtube.com/watch?v=VWkmz-hPnEE";
-		WebView webView = new WebView();
-		webView.getEngine().load(uri);
-		rootLayout.setCenter(webView);
-	}
-	*/
 
 	private Media playSound() throws URISyntaxException {
 		URI oggUri = new URI("file", "/f:/music/Dream Theater/(1993) Live At The Marquee\\04 Dream Theater - Surrounded.mp3", null);

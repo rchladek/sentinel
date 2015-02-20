@@ -1,3 +1,5 @@
+package com.github.virgo47.sentinel;
+
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.DoubleProperty;
 import javafx.geometry.Pos;

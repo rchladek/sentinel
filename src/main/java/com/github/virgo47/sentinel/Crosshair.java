@@ -1,3 +1,5 @@
+package com.github.virgo47.sentinel;
+
 import javafx.geometry.Point2D;
 import javafx.scene.Group;
 import javafx.scene.shape.Line;
