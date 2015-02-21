@@ -7,13 +7,13 @@ import javafx.beans.value.ObservableValue;
 import javafx.concurrent.ScheduledService;
 import javafx.concurrent.Task;
 import javafx.geometry.Orientation;
-import javafx.scene.AmbientLight;
 import javafx.scene.Camera;
 import javafx.scene.Cursor;
 import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.PerspectiveCamera;
+import javafx.scene.PointLight;
 import javafx.scene.Scene;
 import javafx.scene.SceneAntialiasing;
 import javafx.scene.SubScene;
@@ -112,8 +112,12 @@ public class SentinelFx extends Application {
 
 		buildAxes(root3d);
 
-		AmbientLight aLight = new AmbientLight(new Color(0.9, 0.9, 0.95, 1));
-		root3d.getChildren().add(aLight);
+		PointLight pointLight = new PointLight(Color.WHITE);
+		pointLight.setTranslateZ(1000);
+		root3d.getChildren().add(pointLight);
+
+//		AmbientLight aLight = new AmbientLight(new Color(0.9, 0.9, 0.95, 1));
+//		root3d.getChildren().add(aLight);
 
 		PerspectiveCamera camera = new PerspectiveCamera(true);
 		camera.setFarClip(Double.MAX_VALUE);
@@ -349,7 +353,7 @@ public class SentinelFx extends Application {
 			1, 0, 1,
 			2, 0, 0,
 			3, 0, 0,
-			4, 0, 0,
+			4, 0, 1,
 			0, 1, 1,
 			1, 1, 1,
 			2, 1, 0,
@@ -357,12 +361,12 @@ public class SentinelFx extends Application {
 			4, 1, 0,
 			0, 2, 0,
 			1, 2, 0,
-			2, 2, 0,
-			3, 2, 0,
+			2, 2, 1,
+			3, 2, 1,
 			4, 2, 0,
 			0, 3, 0,
 			1, 3, 0,
-			2, 3, 0,
+			2, 3, 2,
 			3, 3, 0,
 			4, 3, 0,
 			0, 4, 0,
@@ -372,11 +376,18 @@ public class SentinelFx extends Application {
 			4, 4, 0
 		);
 		landscapeMesh.getTexCoords().addAll(
-			0.1f, 0.5f,
-			0.3f, 0.5f,
+			0.0f, 0.0f,
+			0.5f, 0.0f,
 			0.5f, 0.5f,
-			0.7f, 0.5f,
-			0.9f, 0.5f
+			0.0f, 0.5f,
+			0.5f, 0.0f,
+			1.0f, 0.0f,
+			1.0f, 0.5f,
+			0.5f, 0.5f,
+			0.0f, 0.5f,
+			0.5f, 0.5f,
+			0.5f, 1.0f,
+			0.0f, 1.0f
 		);
 
 		int sizeX = 4;
@@ -388,13 +399,48 @@ public class SentinelFx extends Application {
 				int pointRightBottom = i * arraySizeX + j + 1;
 				int pointRightTop = (i + 1) * arraySizeX + j + 1;
 				int pointLeftTop = (i + 1) * arraySizeX + j;
-				System.out.println("\nCreating triangles:\n  " +
-					pointLeftBottom + ", " + pointRightBottom + ", " + pointRightTop + "\n  " +
-					pointLeftBottom + ", " + pointRightTop + ", " + pointLeftTop);
-				landscapeMesh.getFaces().addAll(
-					pointLeftBottom, 0, pointRightBottom, 1, pointRightTop, 3,
-					pointLeftBottom, 0, pointRightTop, 3, pointLeftTop, 2
+
+				// by default we make triangles: LB-RB-RT and LB-RT-LT
+				boolean inverseTriangulation = false;
+
+				float zlb = landscapeMesh.getPoints().get(pointLeftBottom * 3 + 2);
+				float zrb = landscapeMesh.getPoints().get(pointRightBottom * 3 + 2);
+				float zrt = landscapeMesh.getPoints().get(pointRightTop * 3 + 2);
+				float zlt = landscapeMesh.getPoints().get(pointLeftTop * 3 + 2);
+
+				boolean triangle1IsFlat = zlb == zrb && zlb == zrt;
+				boolean triangle2IsFlat = zlb == zrt && zlb == zlt;
+				boolean triangleInverse1IsFlat = zlb == zrb && zlb == zlt;
+				boolean triangleInverse2IsFlat = zlt == zrt && zrb == zrt;
+
+				// if the whole square is not flat, but any of default triangles are flat, we want to inverse the triangulation
+				boolean plainSqure = triangle1IsFlat && triangle2IsFlat;
+				boolean invertBecauseOfPartialFlatness = !plainSqure && (triangle1IsFlat || triangle2IsFlat);
+				boolean invertedTrianglesSumIsLower = (2 * zlb + zrb + 2 * zrt + zlt) > (zlb + 2 * zrb + zrt + 2 * zlt);
+				inverseTriangulation = invertBecauseOfPartialFlatness
+					// we also want to prefer valleys instead of high ridges IF it doesn't create new partially-flat squares
+					|| invertedTrianglesSumIsLower && !triangleInverse1IsFlat && !triangleInverse2IsFlat;
+
+				System.out.println("Height(" + i + ',' + j + "): " + zlb + ", " + zrb + ", " + zrt + ", " + zlt +
+					" - triangulation " + (inverseTriangulation ? "inverse" : "default") +
+					", t1flat " + triangle1IsFlat + ", t2flat " + triangle2IsFlat +
+					", ti1flat " + triangleInverse1IsFlat + ", ti2flat " + triangleInverse2IsFlat +
+					", pflat " + invertBecauseOfPartialFlatness + ", isum " + invertedTrianglesSumIsLower
 				);
+
+				int textureIndex = plainSqure ? (i + j) % 2 * 4 : 8;
+
+				if (inverseTriangulation) {
+					landscapeMesh.getFaces().addAll(
+						pointLeftBottom, textureIndex, pointRightBottom, textureIndex + 1, pointLeftTop, textureIndex + 3,
+						pointRightBottom, textureIndex + 1, pointRightTop, textureIndex + 2, pointLeftTop, textureIndex + 3
+					);
+				} else {
+					landscapeMesh.getFaces().addAll(
+						pointLeftBottom, textureIndex, pointRightBottom, textureIndex + 1, pointRightTop, textureIndex + 2,
+						pointLeftBottom, textureIndex, pointRightTop, textureIndex + 2, pointLeftTop, textureIndex + 3
+					);
+				}
 			}
 		}
 		MeshView meshView = new MeshView(landscapeMesh);
@@ -407,7 +453,7 @@ public class SentinelFx extends Application {
 		meshView.setDrawMode(DrawMode.FILL);
 
 		PhongMaterial mat = new PhongMaterial();
-		Image simpleTexture = new Image(getClass().getClassLoader().getResourceAsStream("texture.png"));
+		Image simpleTexture = new Image(getClass().getClassLoader().getResourceAsStream("textures-wood.jpg"));
 		mat.setDiffuseMap(simpleTexture);
 		meshView.setMaterial(mat);
 
