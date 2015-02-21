@@ -42,19 +42,31 @@ public class CameraXform extends Group {
 	}
 
 	public void move(double x, double y, double z) {
+		System.out.println("MOVE: " + x + ',' + y + ',' + z);
 		pos.setX(x + pos.getX());
 		pos.setY(y + pos.getY());
 		pos.setZ(z + pos.getZ());
 	}
 
-	public void moveWithYaw(double direction, double speed) {
-		if (speed == 0) return;
+	public void moveWithYaw(double forwardSpeed, double rightSpeed) {
+		if (forwardSpeed == 0 && rightSpeed == 0) return;
 
 		double yawRadian = Math.toRadians(yaw.getAngle());
-		double deltaX = Math.sin(yawRadian) * speed;
-		double deltaY = Math.cos(yawRadian) * speed;
-		move(deltaX, deltaY, 0);
-		// TODO ...
+		double pitchRadian = Math.toRadians(pitch.getAngle());
+
+		double cosPitch = Math.cos(pitchRadian);
+		double sinYaw = Math.sin(yawRadian);
+		double cosYaw = Math.cos(yawRadian);
+
+		double xForwardFactor = sinYaw * cosPitch * forwardSpeed;
+		double xRightFactor = cosYaw * rightSpeed;
+		double yForwardFactor = cosYaw * cosPitch * forwardSpeed;
+		double yRightFactor = sinYaw * rightSpeed;
+
+		double deltaX = xForwardFactor + xRightFactor;
+		double deltaY = yForwardFactor - yRightFactor;
+		double deltaZ = Math.sin(pitchRadian) * forwardSpeed;
+		move(deltaX, deltaY, deltaZ);
 	}
 
 	public void setRotate(double yw, double ptch, double rll) {

@@ -62,12 +62,21 @@ public class SentinelFx extends Application {
 	public static final Color X_COLOR = Color.RED;
 	public static final Color Y_COLOR = Color.BLUE;
 	public static final Color Z_COLOR = Color.GREEN;
-	public static final double SPEED_WALKING = 1;
-	public static final double SPEED_RUNNING = 3;
+	public static final double FLY_SPEED = 3;
+	public static final double WALK_SPEED = 0.5;
 
-	boolean walk = false;
-	double speed = SPEED_WALKING;
-	boolean spaceClick = false;
+	public static final int STILL = 0;
+	public static final int MOVE = 1;
+
+	// could be booleans, but we want to subtract them
+	private int movingForward;
+	private int movingBack;
+	private int movingRight;
+	private int movingLeft;
+
+	private double speed = FLY_SPEED;
+
+	private boolean spaceClick = false;
 	private Crosshair crosshair;
 
 	@Override
@@ -133,7 +142,9 @@ public class SentinelFx extends Application {
 				return new Task<Void>() {
 					@Override
 					protected Void call() throws Exception {
-						Platform.runLater(() -> cameraNode.moveWithYaw(0, walk ? speed : 0));
+						Platform.runLater(() -> cameraNode.moveWithYaw(
+							(movingForward - movingBack) * speed,
+							(movingRight - movingLeft) * speed));
 						return null;
 					}
 				};
@@ -273,12 +284,7 @@ public class SentinelFx extends Application {
 
 		scene3d.setOnKeyPressed(e -> {
 			KeyCode keycode = e.getCode();
-			if (keycode == KeyCode.E) {
-				walk = true;
-			}
-			if (keycode == KeyCode.A) {
-				speed = SPEED_RUNNING;
-			}
+			modifyDirection(keycode, MOVE); // any 1 constant will do
 			if (keycode == KeyCode.SPACE) {
 				spaceClick = true;
 				// if we could get pick result here easily... now we move to mouse click handler
@@ -288,12 +294,7 @@ public class SentinelFx extends Application {
 
 		scene3d.setOnKeyReleased(e -> {
 			KeyCode keycode = e.getCode();
-			if (keycode == KeyCode.E) {
-				walk = false;
-			}
-			if (keycode == KeyCode.A) {
-				speed = SPEED_WALKING;
-			}
+			modifyDirection(keycode, STILL);
 			if (keycode == KeyCode.SPACE) {
 				spaceClick = false;
 			}
@@ -312,6 +313,24 @@ public class SentinelFx extends Application {
 		crosshair.refreshResetPosition();
 		resetPosition.fire();
 		debugButton.fire();
+	}
+
+	private void modifyDirection(KeyCode keycode, int move) {
+		if (keycode == KeyCode.E) {
+			movingForward = move;
+		}
+		if (keycode == KeyCode.D) {
+			movingBack = move;
+		}
+		if (keycode == KeyCode.F) {
+			movingRight = move;
+		}
+		if (keycode == KeyCode.S) {
+			movingLeft = move;
+		}
+		if (keycode == KeyCode.A) {
+			speed = move == MOVE ? WALK_SPEED : FLY_SPEED;
+		}
 	}
 
 	public void changedSceneSize(ObservableValue<? extends Number> observableValue, Number oldValue, Number newValue) {
@@ -401,7 +420,6 @@ public class SentinelFx extends Application {
 				int pointLeftTop = (i + 1) * arraySizeX + j;
 
 				// by default we make triangles: LB-RB-RT and LB-RT-LT
-				boolean inverseTriangulation = false;
 
 				float zlb = landscapeMesh.getPoints().get(pointLeftBottom * 3 + 2);
 				float zrb = landscapeMesh.getPoints().get(pointRightBottom * 3 + 2);
@@ -417,7 +435,8 @@ public class SentinelFx extends Application {
 				boolean plainSqure = triangle1IsFlat && triangle2IsFlat;
 				boolean invertBecauseOfPartialFlatness = !plainSqure && (triangle1IsFlat || triangle2IsFlat);
 				boolean invertedTrianglesSumIsLower = (2 * zlb + zrb + 2 * zrt + zlt) > (zlb + 2 * zrb + zrt + 2 * zlt);
-				inverseTriangulation = invertBecauseOfPartialFlatness
+
+				boolean inverseTriangulation = invertBecauseOfPartialFlatness
 					// we also want to prefer valleys instead of high ridges IF it doesn't create new partially-flat squares
 					|| invertedTrianglesSumIsLower && !triangleInverse1IsFlat && !triangleInverse2IsFlat;
 
@@ -425,8 +444,7 @@ public class SentinelFx extends Application {
 					" - triangulation " + (inverseTriangulation ? "inverse" : "default") +
 					", t1flat " + triangle1IsFlat + ", t2flat " + triangle2IsFlat +
 					", ti1flat " + triangleInverse1IsFlat + ", ti2flat " + triangleInverse2IsFlat +
-					", pflat " + invertBecauseOfPartialFlatness + ", isum " + invertedTrianglesSumIsLower
-				);
+					", pflat " + invertBecauseOfPartialFlatness + ", isum " + invertedTrianglesSumIsLower);
 
 				int textureIndex = plainSqure ? (i + j) % 2 * 4 : 8;
 
