@@ -42,7 +42,6 @@ public class CameraXform extends Group {
 	}
 
 	public void move(double x, double y, double z) {
-		System.out.println("MOVE: " + x + ',' + y + ',' + z);
 		pos.setX(x + pos.getX());
 		pos.setY(y + pos.getY());
 		pos.setZ(z + pos.getZ());
