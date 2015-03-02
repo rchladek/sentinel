@@ -60,9 +60,8 @@ public class Landscape {
 			int x = random.nextInt(sizeX);
 			int y = random.nextInt(sizeY);
 			int height = random.nextInt(config.maxHeight) + 1;
-			// +1 to avoid division by zero
-			int patchSize = random.nextInt(config.maxPatchSize) / height + minPatchSize(height);
 			height = random.nextBoolean() ? height : -height;
+			int patchSize = random.nextInt(config.maxPatchSize) / Math.abs(height) + minPatchSize(height);
 			log.finer("Patch plan - height=" + height + ", patchSize=" + patchSize + ", x,y=" + x + ',' + y);
 
 			Queue<Position> todoQueue = new ArrayDeque<>();
