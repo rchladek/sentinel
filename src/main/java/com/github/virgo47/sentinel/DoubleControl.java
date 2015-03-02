@@ -27,12 +27,11 @@ public class DoubleControl extends HBox {
 		input = new TextField();
 		slider = new Slider(min, max, initialValue);
 		slider.setShowTickMarks(true);
-//		slider.setShowTickLabels(true);
 		slider.setMajorTickUnit(max / 2);
 		slider.setMinorTickCount(9);
 		slider.setSnapToTicks(true);
 
-		// TODO this will throw Runtime/ParseExceptions
+		// this will throw Runtime/ParseExceptions, but we don't care for our purpose
 		StringConverter<Number> converter = new NumberStringConverter();
 		Bindings.bindBidirectional(input.textProperty(), slider.valueProperty(), converter);
 

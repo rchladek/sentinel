@@ -1,8 +1,18 @@
 package com.github.virgo47.sentinel;
 
 import java.io.FileNotFoundException;
+import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Formatter;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 import javafx.application.Application;
 import javafx.application.ConditionalFeature;
@@ -11,6 +21,7 @@ import javafx.beans.value.ObservableValue;
 import javafx.concurrent.ScheduledService;
 import javafx.concurrent.Task;
 import javafx.geometry.Orientation;
+import javafx.scene.AmbientLight;
 import javafx.scene.Camera;
 import javafx.scene.Cursor;
 import javafx.scene.Group;
@@ -28,7 +39,6 @@ import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.Separator;
 import javafx.scene.control.TextArea;
-import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
@@ -41,11 +51,7 @@ import javafx.scene.media.MediaPlayer;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.PhongMaterial;
 import javafx.scene.shape.Box;
-import javafx.scene.shape.CullFace;
-import javafx.scene.shape.DrawMode;
-import javafx.scene.shape.MeshView;
 import javafx.scene.shape.Sphere;
-import javafx.scene.shape.TriangleMesh;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
 import javafx.scene.transform.Rotate;
@@ -54,6 +60,8 @@ import javafx.stage.Window;
 import javafx.util.Duration;
 
 public class SentinelFx extends Application {
+
+	private static final Logger log = Logger.getLogger(SentinelFx.class.getName());
 
 	private static final KeyCodeCombination KEY_COMBINATION_FULLSCREEN = new KeyCodeCombination(KeyCode.ENTER, KeyCombination.ALT_DOWN);
 
@@ -121,12 +129,14 @@ public class SentinelFx extends Application {
 
 		buildAxes(root3d);
 
-		PointLight pointLight = new PointLight(Color.WHITE);
+		PointLight pointLight = new PointLight(Color.GRAY);
+		pointLight.setTranslateX(200);
+		pointLight.setTranslateY(300);
 		pointLight.setTranslateZ(1000);
 		root3d.getChildren().add(pointLight);
 
-//		AmbientLight aLight = new AmbientLight(new Color(0.9, 0.9, 0.95, 1));
-//		root3d.getChildren().add(aLight);
+		AmbientLight aLight = new AmbientLight(Color.color(0.1, 0.1, 0.1));
+		root3d.getChildren().add(aLight);
 
 		PerspectiveCamera camera = new PerspectiveCamera(true);
 		camera.setFarClip(Double.MAX_VALUE);
@@ -136,6 +146,7 @@ public class SentinelFx extends Application {
 		CameraXform cameraNode = new CameraXform();
 		cameraNode.getChildren().add(camera);
 
+		// TODO can be replaced with Timeline?
 		ScheduledService<Void> svc = new ScheduledService<Void>() {
 			@Override
 			protected Task<Void> createTask() {
@@ -222,7 +233,7 @@ public class SentinelFx extends Application {
 		sphere.setMaterial(new PhongMaterial(Color.BROWN));
 		root3d.getChildren().addAll(sphere);
 
-		addLandscape(root3d);
+		buildLandscape(root3d);
 
 //		Box box = new Box(200, 200, 1);
 //		box.setTranslateZ(-1);
@@ -264,16 +275,16 @@ public class SentinelFx extends Application {
 				PickResult pickResult = e.getPickResult();
 				Node intersectedNode = pickResult.getIntersectedNode();
 				if (intersectedNode instanceof Sphere) {
-					System.out.println("BINGO!");
+					log.info("BINGO!");
 				}
-				System.out.println("pickResult = " + pickResult);
+				log.info("pickResult = " + pickResult);
 			}
 		});
 		mainPane.setOnMouseMoved(e -> {
 			double deltaX = e.getScreenX() - crosshair.getResetX();
 			double deltaY = e.getScreenY() - crosshair.getResetY();
 
-//			System.out.println("MOVE: " +deltaX + ", " + deltaY);
+//			log.finest("Mouse MOVE: " + deltaX + ", " + deltaY);
 			cameraNode.rotate(deltaX, deltaY);
 			crosshair.resetMouse();
 		});
@@ -365,134 +376,19 @@ public class SentinelFx extends Application {
 		group3d.getChildren().addAll(xAxis, yAxis, zAxis);
 	}
 
-	private void addLandscape(Group group3d) throws FileNotFoundException {
-		Landscape landscape = new Landscape(7, 5);
-//		landscape.generate(2, 10);
+	private void buildLandscape(Group group3d) throws FileNotFoundException {
+		Landscape landscape = new Landscape(30, 20);
+		landscape.generate(new Landscape.Config(1, 1, 50, 30));
 
-		TriangleMesh landscapeMesh = new TriangleMesh();
-		for (int x = 0; x <= landscape.sizeX; x++) {
-			for (int y = 0; y <= landscape.sizeY; y++) {
-				landscapeMesh.getPoints().addAll(x, y, landscape.pointHeight(x, y));
-				System.out.println("Added point: " + x + ", " + y + ", " + landscape.pointHeight(x, y));
-			}
-		}
-		/*
-		landscapeMesh.getPoints().addAll(
-			0, 0, 1,
-			1, 0, 1,
-			2, 0, 0,
-			3, 0, 0,
-			4, 0, 1,
-			0, 1, 1,
-			1, 1, 1,
-			2, 1, 0,
-			3, 1, 0,
-			4, 1, 0,
-			0, 2, 0,
-			1, 2, 0,
-			2, 2, 1,
-			3, 2, 1,
-			4, 2, 0,
-			0, 3, 0,
-			1, 3, 0,
-			2, 3, 2,
-			3, 3, 0,
-			4, 3, 0,
-			0, 4, 0,
-			1, 4, 0,
-			2, 4, 0,
-			3, 4, 0,
-			4, 4, 0
-		);
-		*/
-		landscapeMesh.getTexCoords().addAll(
-			0.0f, 0.0f,
-			0.5f, 0.0f,
-			0.5f, 0.5f,
-			0.0f, 0.5f,
-			0.5f, 0.0f,
-			1.0f, 0.0f,
-			1.0f, 0.5f,
-			0.5f, 0.5f,
-			0.0f, 0.5f,
-			0.5f, 0.5f,
-			0.5f, 1.0f,
-			0.0f, 1.0f
-		);
+		LandscapeMeshView landscapeMeshView = new LandscapeMeshView();
+		landscapeMeshView.setLandscape(landscape);
 
-		// north = positive y, east = positive x
-		for (int x = 0; x < landscape.sizeX; x++) {
-			for (int y = 0; y < landscape.sizeY; y++) {
-				int arraySizeY = landscape.sizeY + 1;
-				int pointSW = x  * arraySizeY + y;
-				int pointNW = x  * arraySizeY + (y + 1);
-				int pointNE = (x + 1) * arraySizeY + y + 1;
-				int pointSE = (x + 1) * arraySizeY + y;
-
-				// by default we make triangles: LB-RB-RT and LB-RT-LT
-				// by default we make triangles: SW-SE-NE and SW-NE-NW
-
-				float zsw = landscapeMesh.getPoints().get(pointSW * 3 + 2);
-				float zse = landscapeMesh.getPoints().get(pointSE * 3 + 2);
-				float zne = landscapeMesh.getPoints().get(pointNE * 3 + 2);
-				float znw = landscapeMesh.getPoints().get(pointNW * 3 + 2);
-
-				boolean triangle1IsFlat = zsw == zse && zsw == zne;
-				boolean triangle2IsFlat = zsw == zne && zsw == znw;
-				boolean triangleInverse1IsFlat = zsw == zse && zsw == znw;
-				boolean triangleInverse2IsFlat = znw == zne && zse == zne;
-
-				// if the whole square is not flat, but any of default triangles are flat, we want to inverse the triangulation
-				boolean plainSqure = triangle1IsFlat && triangle2IsFlat;
-				boolean invertBecauseOfPartialFlatness = !plainSqure && (triangle1IsFlat || triangle2IsFlat);
-				boolean invertedTrianglesSumIsLower = (2 * zsw + zse + 2 * zne + znw) > (zsw + 2 * zse + zne + 2 * znw);
-
-				boolean inverseTriangulation = invertBecauseOfPartialFlatness
-					// we also want to prefer valleys instead of high ridges IF it doesn't create new partially-flat squares
-					|| invertedTrianglesSumIsLower && !triangleInverse1IsFlat && !triangleInverse2IsFlat;
-
-				System.out.println("Height(" + x + ',' + y + "): " + zsw + ", " + zse + ", " + zne + ", " + znw +
-					" - triangulation " + (inverseTriangulation ? "inverse" : "default") +
-					", t1flat " + triangle1IsFlat + ", t2flat " + triangle2IsFlat +
-					", ti1flat " + triangleInverse1IsFlat + ", ti2flat " + triangleInverse2IsFlat +
-					", pflat " + invertBecauseOfPartialFlatness + ", isum " + invertedTrianglesSumIsLower);
-
-				int textureIndex = plainSqure ? (x + y) % 2 * 4 : 8;
-
-				if (inverseTriangulation) {
-					landscapeMesh.getFaces().addAll(
-						pointSW, textureIndex, pointSE, textureIndex + 1, pointNW, textureIndex + 3,
-						pointSE, textureIndex + 1, pointNE, textureIndex + 2, pointNW, textureIndex + 3
-					);
-				} else {
-					landscapeMesh.getFaces().addAll(
-						pointSW, textureIndex, pointSE, textureIndex + 1, pointNE, textureIndex + 2,
-						pointSW, textureIndex, pointNE, textureIndex + 2, pointNW, textureIndex + 3
-					);
-				}
-			}
-		}
-		MeshView meshView = new MeshView(landscapeMesh);
-		double scale = 100;
-		meshView.setScaleX(scale);
-		meshView.setScaleY(scale);
-		meshView.setScaleZ(scale / 5);
-
-		meshView.setCullFace(CullFace.BACK);
-		meshView.setDrawMode(DrawMode.FILL);
-
-		PhongMaterial mat = new PhongMaterial();
-		Image simpleTexture = new Image(getClass().getClassLoader().getResourceAsStream("textures-wood.jpg"));
-		mat.setDiffuseMap(simpleTexture);
-		meshView.setMaterial(mat);
-
-		group3d.getChildren().add(meshView);
+		group3d.getChildren().add(landscapeMeshView);
 	}
 
 	private Media playSound() throws URISyntaxException {
-		URI oggUri = new URI("file", "/f:/music/Dream Theater/(1993) Live At The Marquee\\04 Dream Theater - Surrounded.mp3", null);
+		URI oggUri = new URI("file", "some.mp3", null);
 		String source = oggUri.toString();
-		System.out.println("source = " + source);
 		Media media = new Media(source);
 
 		MediaPlayer mediaPlayer = new MediaPlayer(media);
@@ -534,6 +430,26 @@ public class SentinelFx extends Application {
 	}
 
 	public static void main(String[] args) {
+		Logger topLogger = Logger.getLogger("com.github.virgo47");
+		topLogger.setLevel(Level.ALL);
+		ConsoleHandler handler = new ConsoleHandler() {
+			protected void setOutputStream(OutputStream out) throws SecurityException {
+				super.setOutputStream(System.out);
+			}
+		};
+		handler.setLevel(Level.ALL);
+		topLogger.addHandler(handler);
+		handler.setFormatter(new NormalSingleLineFormatter());
+
 		launch(args);
+	}
+
+	private static class NormalSingleLineFormatter extends Formatter {
+		@Override
+		public String format(LogRecord record) {
+			String timestamp = DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(
+				LocalDateTime.ofInstant(Instant.ofEpochMilli(record.getMillis()), ZoneId.systemDefault()));
+			return timestamp + ' ' + record.getLevel() + ' ' + record.getMessage() + System.lineSeparator();
+		}
 	}
 }

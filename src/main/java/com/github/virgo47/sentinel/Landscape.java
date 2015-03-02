@@ -1,10 +1,14 @@
 package com.github.virgo47.sentinel;
 
 import java.util.ArrayDeque;
+import java.util.List;
 import java.util.Queue;
 import java.util.Random;
+import java.util.logging.Logger;
 
 public class Landscape {
+
+	private static final Logger log = Logger.getLogger(Landscape.class.getName());
 
 	private static final int SQUARE_UNPLAYABLE = Integer.MAX_VALUE;
 
@@ -20,18 +24,15 @@ public class Landscape {
 
 	/** Describes heights for flat squares, {@link #SQUARE_UNPLAYABLE} for slopes. */
 	private int[][] gameplan;
+	/** Describes heights at points (square corners) - size must be +1 in both directions compared to {@link #gameplan}. */
 	private int[][] points;
 
-	// current number of uninitialized squares
-	private int uninitialized;
-	// current height to be set
-	private int height;
-
-	public static void main(String[] args) {
-		Landscape landscape = new Landscape(50, 30);
-		landscape.generate(1, 100);
-		System.out.println("LANDSCAPE:\n" + landscape);
-	}
+	/** Sentinel's position - height is determined from gameplan. It should be one of the highest squares, not to mention his base-block. */
+	private Position sentinel;
+	/** Sentries' positions - generally some above average squares. Sentines stand on the ground directly. */
+	private List<Position> sentries;
+	/** Starting position for player. */
+	private Position playerStart;
 
 	public Landscape(int sizeX, int sizeY) {
 		this.sizeX = sizeX;
@@ -43,13 +44,11 @@ public class Landscape {
 	// - ratio between block and height step should be around 2, but different values can provide funny results ;-)
 	// - maxHeight is used both for + and - heights
 	// - 0 height is "middle ground" with highest probability of occurrance
-	public void generate(int maxHeight, int maxPatchSize) {
-		// middle ground will be offset for height 0 (internally 0 is minimum height)
-		int middleGround = maxHeight;
-		// we will use maxHeight as maximum random int (never rached)
-		maxHeight = maxHeight * 2 + 1;
-
+	public void generate(Config config) {
 		Random random = new Random(0);
+
+		int changes = random.nextInt(config.changesCount) + config.changesCount / 2;
+		log.fine("Requested changes " + config.changesCount + ", planned changes " + changes);
 
 		/*
 		There are many options here:
@@ -57,58 +56,75 @@ public class Landscape {
 		2. go row by row with some probability of change in height (based on both previous column and row)
 		...?
 		 */
-		while (uninitialized > 0) {
+		while (changes > 0) {
 			int x = random.nextInt(sizeX);
 			int y = random.nextInt(sizeY);
-			height = random.nextInt(maxHeight) - middleGround;
+			int height = random.nextInt(config.maxHeight) + 1;
 			// +1 to avoid division by zero
-			int patchSize = random.nextInt(maxPatchSize) / (Math.abs(height) + 1) + minPatchSize(height);
-			System.out.println("new patch plan - height=" + height + ", patchSize=" + patchSize + ", x,y=" + x + ',' + y);
+			int patchSize = random.nextInt(config.maxPatchSize) / height + minPatchSize(height);
+			height = random.nextBoolean() ? height : -height;
+			log.finer("Patch plan - height=" + height + ", patchSize=" + patchSize + ", x,y=" + x + ',' + y);
 
 			Queue<Position> todoQueue = new ArrayDeque<>();
-			addWork(todoQueue, new Position(x, y));
+			todoQueue.add(new Position(x, y));
 
 			// from now on we use pos, not x,y
-			while (patchSize > 0 && uninitialized > 0) {
+			while (patchSize > 0) {
 				Position pos = todoQueue.poll();
-				System.out.println("Found " + pos + ", todo size: " + todoQueue.size());
-				if (pos == null) break;
+				log.finest("Found " + pos + ", left size: " + todoQueue.size());
+				if (pos == null) {
+					log.finer("Finishing patch prematurely with left patchSize " + patchSize);
+					break;
+				}
+
+				if (setGameplanSquare(pos, height, config.maxHeightDifference)) {
+					patchSize -= 1;
+				}
 
 				int whereNext = random.nextInt(16);
 				if ((whereNext & WALK_NORTH) > 0 && pos.y < sizeY - 1) {
-					addWork(todoQueue, pos.north());
+					todoQueue.add(pos.north());
 				}
 				if ((whereNext & WALK_WEST) > 0 && pos.x > 0) {
-					addWork(todoQueue, pos.west());
+					todoQueue.add(pos.west());
 				}
 				if ((whereNext & WALK_SOUTH) > 0 && pos.y > 0) {
-					addWork(todoQueue, pos.south());
+					todoQueue.add(pos.south());
 				}
 				if ((whereNext & WALK_EAST) > 0 && pos.x < sizeX - 1) {
-					addWork(todoQueue, pos.east());
+					todoQueue.add(pos.east());
 				}
 			}
 
-			// frame it with UNPLAYABLEs
+			changes -= 1;
 		}
 	}
 
-	private void addWork(Queue<Position> todoQueue, Position pos) {
-		todoQueue.add(pos);
-		setGameplanSquare(pos, height);
+	/**
+	 * Higher level change of the gameplan, that also fixes maximal requested height difference, fixes
+	 * slopes across more than a single square, joins squares with the same height across vertical
+	 * or horizontal gap (not diagonal), and also chooses candidates for sentinel/sentry/player position.
+	 */
+	private boolean setGameplanSquare(Position pos, int height, int maxHeightDifference) {
+		boolean changed = setGameplanSquare(pos.x, pos.y, height);
+		if (changed) {
+			// TODO stuff we promised in javadoc
+			// TODO don't forget about landscape update with proper values included UNPLAYABLE
+		}
+		return changed;
 	}
 
-	private void setGameplanSquare(Position pos, int height) {
-		setGameplanSquare(pos.x, pos.y, height);
-	}
+	/** Low level change of the gameplan and its geometry. */
+	private boolean setGameplanSquare(int x, int y, int height) {
+		if (gameplan[x][y] == height) return false;
 
-	private void setGameplanSquare(int x, int y, int height) {
 		gameplan[x][y] = height;
 		points[x][y] = height;
 		points[x + 1][y] = height;
 		points[x + 1][y + 1] = height;
 		points[x][y + 1] = height;
-		System.out.println("Initialized (" + x + ',' + y + ") to height: " + height);
+		log.finer("Square (" + x + ',' + y + ") set to height: " + height);
+		return true;
 	}
 
 	private void initializeFlatGameplan() {
@@ -119,7 +135,6 @@ public class Landscape {
 				setGameplanSquare(i, j, 0);
 			}
 		}
-		uninitialized = sizeX * sizeY;
 	}
 
 	private int minPatchSize(int height) {
@@ -130,7 +145,7 @@ public class Landscape {
 		return points[x][y];
 	}
 
-	private class Position {
+	private static class Position {
 
 		public int x, y;
 
@@ -158,6 +173,22 @@ public class Landscape {
 
 		public Position east() {
 			return new Position(x + 1, y);
+		}
+	}
+
+	/** Configuration for landscape generation. */
+	public static class Config {
+
+		public final int maxHeight;
+		public final int maxHeightDifference;
+		public final int maxPatchSize;
+		public final int changesCount;
+
+		public Config(int maxHeight, int maxHeightDifference, int maxPatchSize, int changesCount) {
+			this.maxHeight = maxHeight;
+			this.maxHeightDifference = maxHeightDifference;
+			this.maxPatchSize = maxPatchSize;
+			this.changesCount = changesCount;
 		}
 	}
 }

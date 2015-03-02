@@ -8,8 +8,11 @@ import javafx.scene.shape.StrokeLineCap;
 import java.awt.AWTException;
 import java.awt.Robot;
 import java.awt.event.InputEvent;
+import java.util.logging.Logger;
 
 public class Crosshair extends Group {
+
+	private static final Logger log = Logger.getLogger(Crosshair.class.getName());
 
 	private static final int CROSSHAIR_RADIUS = 10;
 	private static final double CROSSHAIR_THICKNESS = 1.5;
@@ -58,6 +61,6 @@ public class Crosshair extends Group {
 		resetX = (int) screenPoint.getX();
 		resetY = (int) screenPoint.getY();
 		resetMouse();
-		System.out.println("REFRESH: " + resetX + ", " + resetY);
+		log.finer("REFRESH: " + resetX + ", " + resetY);
 	}
 }

@@ -18,7 +18,7 @@ public class CameraXform extends Group {
 	private static final Rotate PITCH_OFFSET = new Rotate(-90, Rotate.X_AXIS);
 
 	public Rotate yaw = new Rotate(0, new Point3D(0, 0, -1)); // Z axis, but clockwise, so that it goes like compass
-	public Rotate pitch = new Rotate(0, Rotate.X_AXIS);
+	public Rotate pitch = new Rotate(0, Rotate.X_AXIS );
 	public Rotate roll = new Rotate(0, Rotate.Y_AXIS);
 	public Translate pos = new Translate();
 
