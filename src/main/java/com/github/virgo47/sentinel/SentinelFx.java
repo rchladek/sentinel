@@ -51,7 +51,6 @@ import javafx.scene.media.MediaPlayer;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.PhongMaterial;
 import javafx.scene.shape.Box;
-import javafx.scene.shape.Sphere;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
 import javafx.scene.transform.Rotate;
@@ -185,16 +184,6 @@ public class SentinelFx extends Application {
 		});
 		DoubleControl fovControl = new DoubleControl("FOV", 1, 180, 45);
 
-		DoubleControl sxControl = new DoubleControl("X", -1000, 1000, -20);
-		DoubleControl syControl = new DoubleControl("Y", -1000, 1000, 10);
-		DoubleControl szControl = new DoubleControl("Z", -1000, 1000, 0);
-		Button resetSphere = new Button("Reset");
-		resetSphere.setOnAction(e -> {
-			sxControl.valueProperty().set(0);
-			syControl.valueProperty().set(0);
-			szControl.valueProperty().set(0);
-		});
-
 		root3d.getChildren().add(cameraNode);
 
 		Button debugButton = new Button("Debug output");
@@ -216,10 +205,6 @@ public class SentinelFx extends Application {
 			new Label("Field of view (degrees)"),
 			fovControl,
 			new Separator(Orientation.HORIZONTAL),
-			new Label("Sphere position"),
-			sxControl, syControl, szControl,
-			resetSphere,
-			new Separator(Orientation.HORIZONTAL),
 			debugButton,
 			debugOutput
 		);
@@ -229,15 +214,7 @@ public class SentinelFx extends Application {
 			"-fx-border-width: 2px;" +
 			"-fx-padding: 5px;");
 
-		Sphere sphere = new Sphere(10);
-		sphere.setMaterial(new PhongMaterial(Color.BROWN));
-		root3d.getChildren().addAll(sphere);
-
 		buildLandscape(root3d);
-
-//		Box box = new Box(200, 200, 1);
-//		box.setTranslateZ(-1);
-//		root3d.getChildren().addAll(box);
 
 		cameraNode.invertMouse = true;
 
@@ -250,10 +227,6 @@ public class SentinelFx extends Application {
 		cameraNode.roll.angleProperty().bindBidirectional(rollControl.valueProperty());
 
 		camera.fieldOfViewProperty().bindBidirectional(fovControl.valueProperty());
-
-		sphere.translateXProperty().bindBidirectional(sxControl.valueProperty());
-		sphere.translateYProperty().bindBidirectional(syControl.valueProperty());
-		sphere.translateZProperty().bindBidirectional(szControl.valueProperty());
 
 		layout2d.setRight(controls);
 		layout2d.setTop(menuBar);
@@ -274,9 +247,6 @@ public class SentinelFx extends Application {
 			if (spaceClick) {
 				PickResult pickResult = e.getPickResult();
 				Node intersectedNode = pickResult.getIntersectedNode();
-				if (intersectedNode instanceof Sphere) {
-					log.info("BINGO!");
-				}
 				log.info("pickResult = " + pickResult);
 			}
 		});
@@ -377,8 +347,10 @@ public class SentinelFx extends Application {
 	}
 
 	private void buildLandscape(Group group3d) throws FileNotFoundException {
-		Landscape landscape = new Landscape(30, 20);
-		landscape.generate(new Landscape.Config(1, 1, 50, 30));
+		Landscape landscape = new Landscape(50, 30, new Landscape.Config(1, 1, 50, 30));
+//		landscape.performChange(5, 5, 2, 2);
+//		landscape.performChange(20, 12, 3, 1);
+		landscape.generate(0);
 
 		LandscapeMeshView landscapeMeshView = new LandscapeMeshView();
 		landscapeMeshView.setLandscape(landscape);
