@@ -347,9 +347,7 @@ public class SentinelFx extends Application {
 	}
 
 	private void buildLandscape(Group group3d) throws FileNotFoundException {
-		Landscape landscape = new Landscape(50, 30, new Landscape.Config(1, 1, 50, 30));
-//		landscape.performChange(5, 5, 2, 2);
-//		landscape.performChange(20, 12, 3, 1);
+		Landscape landscape = new Landscape(32, 24, new Landscape.Config(1, 1, 30, 30));
 		landscape.generate(0);
 
 		LandscapeMeshView landscapeMeshView = new LandscapeMeshView();

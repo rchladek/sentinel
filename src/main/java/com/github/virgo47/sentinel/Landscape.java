@@ -8,9 +8,9 @@ import java.util.logging.Logger;
 
 public class Landscape {
 
-	private static final Logger log = Logger.getLogger(Landscape.class.getName());
+	static final int SQUARE_UNPLAYABLE = Integer.MAX_VALUE;
 
-	private static final int SQUARE_UNPLAYABLE = Integer.MAX_VALUE;
+	private static final Logger log = Logger.getLogger(Landscape.class.getName());
 
 	private static final int MIN_PATCH_SIZE = 5;
 
@@ -54,18 +54,18 @@ public class Landscape {
 		log.fine("Requested changes " + config.changesCount + ", planned changes " + changes);
 
 		while (changes > 0) {
-			if (createNextChange()) {
+			if (createNextChange(changes)) {
 				changes -= 1;
 			}
 		}
 	}
 
-	private boolean createNextChange() {
+	private boolean createNextChange(int changesLeft) {
 		int x = random.nextInt(sizeX);
 		int y = random.nextInt(sizeY);
 		int height = random.nextInt(config.maxHeight) + 1;
 		height = random.nextBoolean() ? height : -height;
-		int patchSize = random.nextInt(config.maxPatchSize) / Math.abs(height) + minPatchSize(height);
+		int patchSize = random.nextInt(config.maxPatchSize) / Math.abs(height) + minPatchSize(height) + changesLeft;
 		return performChange(new Position(x, y), height, patchSize);
 	}
 
@@ -89,7 +89,7 @@ public class Landscape {
 				break;
 			}
 
-			if (setGameplanSquare(pos, height)) {
+			if (setSquare(pos, height)) {
 				patchSize -= 1;
 			}
 
@@ -116,15 +116,19 @@ public class Landscape {
 		}
 	}
 
+	// not private for testing purposes
+	boolean setSquare(int x, int y, int height) {
+		return setSquare(new Position(x, y), height);
+	}
+
 	/**
-	 * Higher level change of the gameplan, that also fixes maximal requested height difference, fixes
+	 * Higher level change of the landscape, that also fixes maximal requested height difference, fixes
 	 * slopes across more than a single square, joins squares with the same height across vertical
 	 * or horizontal gap (not diagonal), and also chooses candidates for sentinel/sentry/player position.
 	 */
-	private boolean setGameplanSquare(Position pos, int height) {
+	private boolean setSquare(Position pos, int height) {
 		boolean changed = setGameplan(pos, height);
 		if (changed) {
-
 			checkSurrounding(pos.east(), pos.east(2), height);
 			checkSurrounding(pos.north(), pos.north(2), height);
 			checkSurrounding(pos.west(), pos.west(2), height);
@@ -157,7 +161,27 @@ public class Landscape {
 		points[x + 1][y] = height;
 		points[x + 1][y + 1] = height;
 		points[x][y + 1] = height;
+
+		setSurroundingUnplayable(x, y, height);
 		return true;
+	}
+
+	private void setSurroundingUnplayable(int x, int y, int height) {
+		setGameplanUnplayable(x + 1, y, height);
+		setGameplanUnplayable(x + 1, y + 1, height);
+		setGameplanUnplayable(x, y + 1, height);
+		setGameplanUnplayable(x - 1, y + 1, height);
+		setGameplanUnplayable(x - 1, y, height);
+		setGameplanUnplayable(x - 1, y - 1, height);
+		setGameplanUnplayable(x, y - 1, height);
+		setGameplanUnplayable(x + 1, y - 1, height);
+	}
+
+	/** Sets the gameplan square to uplayable if the position is valid (not out of bounds) and it does not already have the specified height. */
+	private void setGameplanUnplayable(int x, int y, int height) {
+		if (isValidPosition(x, y) && gameplan(x, y) != height) {
+			setGameplan(x, y, SQUARE_UNPLAYABLE);
+		}
 	}
 
 	private void checkSurrounding(Position next, Position nextNext, int height) {
@@ -169,24 +193,33 @@ public class Landscape {
 		if (nextNextHeight != SQUARE_UNPLAYABLE) {
 			// fixes maximum height difference
 			if ((nextNextHeight - height) > config.maxHeightDifference) {
-				setGameplanSquare(nextNext, height + config.maxHeightDifference);
+				setSquare(nextNext, height + config.maxHeightDifference);
 			} else if ((height - nextNextHeight) > config.maxHeightDifference) {
-				setGameplanSquare(nextNext, height - config.maxHeightDifference);
+				setSquare(nextNext, height - config.maxHeightDifference);
 			}
 		}
 		// joins patches of the same height
 		if (nextNextHeight == height) {
-			setGameplanSquare(next, height);
+			setSquare(next, height);
 		}
 	}
 
 	private int gameplan(Position pos) {
-		return gameplan[pos.x][pos.y];
+		return gameplan(pos.x, pos.y);
+	}
+
+	// not private for testing purposes
+	int gameplan(int x, int y) {
+		return gameplan[x][y];
 	}
 
 	private boolean isValidPosition(Position pos) {
-		return pos.x >= 0 && pos.x < sizeX
-			&& pos.y >= 0 && pos.y < sizeY;
+		return isValidPosition(pos.x, pos.y);
+	}
+
+	private boolean isValidPosition(int x, int y) {
+		return x >= 0 && x < sizeX
+			&& y >= 0 && y < sizeY;
 	}
 
 	private void initializeFlatGameplan() {
