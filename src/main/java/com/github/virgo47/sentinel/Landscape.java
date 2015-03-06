@@ -240,7 +240,7 @@ public class Landscape {
 		return points[x][y];
 	}
 
-	private static final class Position {
+	public static final class Position {
 
 		public final int x;
 		public final int y;
